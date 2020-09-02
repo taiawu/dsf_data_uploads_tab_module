@@ -55,11 +55,189 @@ read_qTower_by_channel <- function(df, channel_choice) {
     
 }
 
+# Define server logic required to draw a histogram
+selectVarServer <- function(id, data, filter = is.numeric) {
+    stopifnot(is.reactive(data))
+    stopifnot(!is.reactive(filter))
+    
+    moduleServer(id, function(input, output, session) {
+        observeEvent(data(), {
+            updateSelectInput(session, "var", choices = find_vars(data(), filter))
+        })
+        
+        list(
+            name = reactive(input$var),
+            value = reactive(data()[[input$var]])
+        )
+    })
+}
+
+qTowerUploadServer_to_channel <- function(id, file_in) {
+    moduleServer(id,  function(input, output, session)  {
+        file <- reactive(file_in)
+        observeEvent(file(), {
+            qTower_raw_list <-  reactive(read_qTower_to_channel(file))
+            shinyalert(inputId = "alert_pick_channel1", "Which channel would you like to analyze?", qTower_raw_list()$channels, type = "input")
+        })
+        print("in upload server")
+       # print(is.reactive(input$uploaded_file$datapath))
+
+        
+        
+        df_out <- eventReactive(input$alert_pick_channel1, {
+            print("shinyalter channel pciked")
+            if (!input$alert_pick_channel1 %in% qTower_raw_list()$channels) {
+                shinyalert(inputId = "alert_pick_channel1", "Selected channel is not in the data. Please enter one of the following channels:", qTower_raw_list()$channels, type = "input")
+
+            } else {
+                            df_out <- reactive(read_qTower_by_channel(qTower_raw_list()$df, input$alert_pick_channel1) %>%
+                                        mutate_if(is.factor, as.character) %>% # make any factors characters
+                                        mutate_all(as.numeric)  %>% # make all numeric
+                                        filter_all(any_vars(!is.na(.))) %>% # drop any rows which are all NAs
+                                        discard(~all(is.na(.x)))) # drop any columns which are all NAs
+                            
+                            print(head(df_out()))
+            #qTower_final_out <- reactive(qTower_raw_list()$df)
+            }
+            print(head(df_out))
+            df_out
+            })
+        
+        reactive(df_out())
+        
+        # observeEvent(input$alert_pick_channel1, {
+        #     if (!input$alert_pick_channel1 %in% qTower_raw_list()$channels) {
+        #         shinyalert(inputId = "alert_pick_channel1", "Selected channel is not in the data. Please enter one of the following channels:", qTower_raw_list()$channels, type = "input")
+        # 
+        #     } else {
+        #                     df_out <- reactive(read_qTower_by_channel(qTower_raw_list()$df, input$alert_pick_channel1) %>%
+        #                                 mutate_if(is.factor, as.character) %>% # make any factors characters
+        #                                 mutate_all(as.numeric)  %>% # make all numeric
+        #                                 filter_all(any_vars(!is.na(.))) %>% # drop any rows which are all NAs
+        #                                 discard(~all(is.na(.x)))) # drop any columns which are all NAs
+        #     #qTower_final_out <- reactive(qTower_raw_list()$df)
+        # }
+        #     })
+        
+        #print(head(qTower_raw_list$df))
+        # observeEvent(df_out(), {
+        #     outlist <- reactive(list(df = df_out(),
+        #                              channel_choice = input$alert_pick_channel1))  
+        # })
+        
+        
+        #outlist()
+    })}
+# 
+#         # req(input$alert_pick_channel1)
+#         # if (!input$alert_pick_channel1 %in% qTower_raw_list$channels) {
+#         #     shinyalert(inputId = "alert_pick_channel2","Selected channel is not in the data. Please re-upload data and try again!")
+#         # } else {
+#         #     df <- read_qTower_by_channel(qTower_raw_list$df, input$alert_pick_channel1) %>%
+#         #         mutate_if(is.factor, as.character) %>% # make any factors characters
+#         #         mutate_all(as.numeric)  %>% # make all numeric
+#         #         filter_all(any_vars(!is.na(.))) %>% # drop any rows which are all NAs
+#         #         discard(~all(is.na(.x))) # drop any columns which are all NAs   
+#         #     head(df)
+#         #     }
+#      
+#         # df_out <- eventReactive(input$alert_pick_channel1, { 
+#         #         # if (input$alert_pick_channel1 %in% qTower_raw_list$channels) {
+#         #         #     print("read qTower by channel")
+#         #                         df <- read_qTower_by_channel(qTower_raw_list$df, input$alert_pick_channel1) %>%
+#         #                             mutate_if(is.factor, as.character) %>% # make any factors characters
+#         #                             mutate_all(as.numeric)  %>% # make all numeric
+#         #                             filter_all(any_vars(!is.na(.))) %>% # drop any rows which are all NAs
+#         #                             discard(~all(is.na(.x))) # drop any columns which are all NAs
+#         #                         #print(df %>% head())
+#         #                         print("qtower read")
+#         #                         df
+#         #                         #return(reactive(df))
+#         # 
+#         #                     # } else {
+#         #                     #     print("bad channel")
+#         #                     #     shinyalert(inputId = "alert_pick_channel2","Selected channel is not in the data. Please re-upload data and try again!")
+#         #                     #    # return(NULL)
+#         #                     # }
+#         #     
+#         #     })
+#         observeEvent(input$alert_pick_channel1, {
+#             if (input$alert_pick_channel1 %in% qTower_raw_list$channels) {
+#                 print("read qTower by channel")
+#                             df_out <- reactive({read_qTower_by_channel(qTower_raw_list$df, input$alert_pick_channel1) %>%
+#                                 mutate_if(is.factor, as.character) %>% # make any factors characters
+#                                 mutate_all(as.numeric)  %>% # make all numeric
+#                                 filter_all(any_vars(!is.na(.))) %>% # drop any rows which are all NAs
+#                                 discard(~all(is.na(.x)))})  # drop any columns which are all NAs
+#                             print(df_out() %>% head())
+#                             print("qtower read")
+#                             #return(reactive(df))
+#                             #head(df_out)
+#                         } else {
+#                             print("bad channel")
+#                             shinyalert(inputId = "alert_pick_channel2","Selected channel is not in the data. Please re-upload data and try again!")
+#                            # return(NULL)
+#                         }
+#         })
+#         
+#         # print("outside observe")
+#         # #print(head(Df))
+#         print(head(df_out()))
+#         #reactive(df_out) # return this reactive value from the module
+#         # 
+#         # print(df %>% head())
+#         # reactive(df) # return this reactive value from the module
+#         
+#         
+#     #     #qTower_raw_list <- reactive({
+#     #        # req(input$uploaded_file$datapath)
+#     #         print("passed file path")
+#     #         
+#     #         print(file)
+#     #         
+#     #         qTower_start_list <- read_qTower_to_channel(file)  
+#     #         print(names(qTower_start_list))
+#     #         shinyalert(inputId = "alert_pick_channel1", "Which channel would you like to analyze?", qTower_start_list$channels, type = "input")
+#     #         qTower_start_list
+#     #     }) # read the input file
+#     #     
+#     #     data_raw <- eventReactive({input$alert_pick_channel1
+#     #         input$uploaded_file$datapath
+#     #         #file_path
+#     #     }, {
+#     #         print("entering data raw assignment")
+#     #         
+#     #         #req(new_upload)                       
+#     #         req(qTower_raw_list())
+#     #         req(input$alert_pick_channel1)
+#     #         
+#     #         if (input$alert_pick_channel1 %in% qTower_raw_list()$channels) {
+#     #             df <- read_qTower_by_channel(qTower_raw_list()$df, input$alert_pick_channel1)  
+#     #             print("read qTower by channel")
+#     #         } else {
+#     #             shinyalert(inputId = "alert_pick_channel2","Selected channel is not in the data. Please re-upload data and try again!")
+#     #         }
+#     #         
+#     #         df <- df %>% # in case someone has a file that reads in as characters
+#     #             mutate_if(is.factor, as.character) %>% # make any factors characters
+#     #             mutate_all(as.numeric)  %>% # make all numeric
+#     #             filter_all(any_vars(!is.na(.))) %>% # drop any rows which are all NAs
+#     #             discard(~all(is.na(.x))) # drop any columns which are all NAs
+#     #         
+#     #         
+#     #         df 
+#     #     })
+#     #     
+# 
+#     #     
+#      })
+# }
+
 # Define UI for application that draws a histogram
 ui <- fluidPage(useShinyalert(),
 
     # Application title
-    titlePanel("Old Faithful Geyser Data"),
+    titlePanel("qTower uploader"),
 
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
@@ -82,72 +260,127 @@ ui <- fluidPage(useShinyalert(),
     )
 )
 
+# server <- function(input, output, session) {
+#     # 
+#     # observeEvent(input$uploaded_file, {
+#     #     data_raw <- qTowerUploadServer("uploaded_file", file = input$uploaded_file$datapath)
+#     # })
+#     # 
+#     data_raw <-  eventReactive(input$uploaded_file, {
+#         print("entring upload server")
+#         #qTowerUploadServer("uploaded_file")
+#         #qTowerUploadServer("uploaded_file", file = input$uploaded_file$datapath)
+#         qTowerUploadServer_to_channel("uploaded_file", file_in = input$uploaded_file$datapath)
+#     })
+#     
+#     observeEvent(data_raw(), {
+#         print("data_raw changed")
+#         print(data_raw() %>% str())
+#     })
+#     
+#      
+#     
+#     output$input_file <- renderDataTable({
+#         req(data_raw())
+#         tryCatch(
+#             data_raw(),
+#             error = function(e) {
+#                 shinyalert("File needs pre-formatting!", "Please select your instrument from 'Supported Reformatting'. Or, if you don't see your instrument there, please format your data as shown in the downloadable template and upload again.")
+#             }
+#         )
+#     }, options = list(scrollX = TRUE, scrollY = 500, scrollCollapse = TRUE, paging = FALSE, dom = 't'))
+#     
+# }
+# 
+# 
+# 
+# 
+# 
+# 
+# # Run the application 
+# shinyApp(ui = ui, server = server)
+
+# 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
-    
-new_upload <- "new"
-    observeEvent(input$uploaded_file$datapath, {
-            new_upload <- NULL
-    })
-    
-
-    observeEvent(input$alert_pick_channel1, {
-            new_upload <- "new"
-    })
-    
-    qTower_raw_list <- reactive({
-        req(input$uploaded_file)
-        file <- input$uploaded_file$datapath
+    new_file <- FALSE
+    observeEvent(input$uploaded_file, {
+        new_file <- FALSE
+        print("uploaded a file!")
+        #req(input$uploaded_file)
         
-            qTower_start_list <- read_qTower_to_channel(file)  
+       # qTower_raw_list <- reactive({
+
+            file <- input$uploaded_file$datapath
+            
+            qTower_start_list <- read_qTower_to_channel(file)
             shinyalert(inputId = "alert_pick_channel1", "Which channel would you like to analyze?", qTower_start_list$channels, type = "input")
-           # new_upload <- "new"
-           # if (input$alert_pick_channel1)
-            
-               # print(input$shinyalert)
-            # } else {
-            #     shinyalert("This file needs pre-formatting")
-            # }
-           # print(channel_choice())
-            # df <- df %>% # in case someone has a file that reads in as characters
-            #     mutate_if(is.factor, as.character) %>% # make any factors characters
-            #     mutate_all(as.numeric)  %>% # make all numeric
-            #     filter_all(any_vars(!is.na(.))) %>% # drop any rows which are all NAs
-            #     discard(~all(is.na(.x))) # drop any columns which are all NAs
-            
-      
-            # shinyalert("This file needs pre-formatting", "Please select your instrument from 'Reformat raw from instrument'. If you don't see your instrument there, please format your data as shown in the downloadable template and upload again.")
-            # values$data_raw <<- NULL
-            qTower_start_list
-    }) # read the input file
+           # qTower_start_list()
+       # }) # read the input file
+        
+    })
+
+    # qt_data <- NULL
+    # observeEvent(input$alert_pick_channel1, {
+    #   #  if (input$alert_pick_channel1) {
+    #             if (input$alert_pick_channel1 %in% qTower_start_list$channels) {
+    #                 qt_data <- read_qTower_by_channel(qTower_start_list$df, input$alert_pick_channel1) %>%
+    #                             mutate_if(is.factor, as.character) %>% # make any factors characters
+    #                             mutate_all(as.numeric)  %>% # make all numeric
+    #                             filter_all(any_vars(!is.na(.))) %>% # drop any rows which are all NAs
+    #                             discard(~all(is.na(.x))) # drop any columns which are all NAs
+    #                 print("read qTower by channel")
+    #             } else {
+    #                 shinyalert(inputId = "alert_pick_channel2","Selected channel is not in the data. Please re-upload data and try again!")
+    #                 qt_data <- NULL
+    #             }
+    #     
+    # 
+    #             data_raw <- reactive(qt_data) #<- reactive(df)
+    # 
+    #    # }
+    # })
     
- data_raw <- eventReactive({input$alert_pick_channel1
-                           input$uploaded_file
-                           }, {
-     print("entering data raw assignment")
-                               
-     req(new_upload)                       
-     req(qTower_raw_list())
-     req(input$alert_pick_channel1)
-     
-     if (input$alert_pick_channel1 %in% qTower_raw_list()$channels) {
-         df <- read_qTower_by_channel(qTower_raw_list()$df, input$alert_pick_channel1)  
-         print("read qTower by channel")
-     } else {
-         shinyalert(inputId = "alert_pick_channel2","Selected channel is not in the data. Please re-upload data and try again!")
-         #shinyalert(inputId = "alert_pick_channel2","Selected channel is not in the data. Which of the following channels would you like to analyze?", qTower_raw_list()$channels, type = "input")
-         #df <- read_qTower_by_channel(qTower_raw_list()$df, input$alert_pick_channel2)
-     }
-     
-     df
-     
- })
-    
-    
-    
+# 
+# observeEvent(qTower_start_list, {
+#     print("changing new file")
+#     new_file <- TRUE
+# })
+
+    data_raw <- eventReactive({input$alert_pick_channel1
+        input$uploaded_file
+    }, {
+        print("entering data raw assignment")
+
+        ##req(new_upload)
+       # req(qTower_raw_list())
+        req(input$alert_pick_channel1)
+
+        if (input$alert_pick_channel1 %in% qTower_start_list$channels) {
+            df <- read_qTower_by_channel(qTower_start_list$df, input$alert_pick_channel1) %>%
+                mutate_if(is.factor, as.character) %>% # make any factors characters
+                mutate_all(as.numeric)  %>% # make all numeric
+                filter_all(any_vars(!is.na(.))) %>% # drop any rows which are all NAs
+                discard(~all(is.na(.x))) # drop any columns which are all NAs
+            print("read qTower by channel")
+        } else {
+            shinyalert(inputId = "alert_pick_channel2","Selected channel is not in the data. Please re-upload data and try again!")
+            df <- NULL
+        }
+       # new_file <- TRUE
+        df
+
+    })
+
+
+
     output$input_file <- renderDataTable({
-        req(data_raw())
+       # print(new_file)
+        
+       # req(new_file == TRUE)
+       req(data_raw())
         tryCatch(
+           # df,
             data_raw(),
             error = function(e) {
                 shinyalert("File needs pre-formatting!", "Please select your instrument from 'Supported Reformatting'. Or, if you don't see your instrument there, please format your data as shown in the downloadable template and upload again.")
@@ -155,8 +388,8 @@ new_upload <- "new"
         )
     }, options = list(scrollX = TRUE, scrollY = 500, scrollCollapse = TRUE, paging = FALSE, dom = 't')
     )
-    
+
 }
 
-# Run the application 
+# # Run the application 
 shinyApp(ui = ui, server = server)
